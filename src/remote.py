@@ -221,7 +221,8 @@ def shell_command(root, script, mode):
         fd = socket_filter.fileno()
         export_socket_filter(fd)
         return command([
-            bwrap, "--unshare-all", "--disable-userns", "--new-session", "--die-with-parent",
+            bwrap, "--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-net", "--unshare-uts",
+            "--disable-userns", "--new-session", "--die-with-parent",
             "--cap-drop", "ALL", "--seccomp", str(fd), *mounts, "--chdir", root, "--", *argv,
         ], root, 90, (fd,))
 
