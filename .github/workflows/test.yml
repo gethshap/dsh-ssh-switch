@@ -1,0 +1,52 @@
+name: Test
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Start a loopback OpenSSH server
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y openssh-server ripgrep bubblewrap libseccomp2
+          ssh_dir="$(mktemp -d)"
+          ssh-keygen -q -t ed25519 -N '' -f "$ssh_dir/host"
+          ssh-keygen -q -t ed25519 -N '' -f "$ssh_dir/client"
+          printf '[127.0.0.1]:32222 %s\n' "$(cut -d ' ' -f 1,2 "$ssh_dir/host.pub")" > "$ssh_dir/known_hosts"
+          cat > "$ssh_dir/server_config" <<EOF
+          Port 32222
+          ListenAddress 127.0.0.1
+          HostKey $ssh_dir/host
+          AuthorizedKeysFile $ssh_dir/client.pub
+          PidFile $ssh_dir/sshd.pid
+          AllowUsers $USER
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          UsePAM yes
+          EOF
+          cat > "$ssh_dir/client_config" <<EOF
+          Host dsh-loopback
+            HostName 127.0.0.1
+            Port 32222
+            User $USER
+            IdentityFile $ssh_dir/client
+            UserKnownHostsFile $ssh_dir/known_hosts
+          EOF
+          sudo install -d /run/sshd
+          sudo /usr/sbin/sshd -f "$ssh_dir/server_config" -E "$ssh_dir/sshd.log"
+          printf 'DSH_SSH_TEST_CONFIG=%s\n' "$ssh_dir/client_config" >> "$GITHUB_ENV"
+          if bwrap --unshare-all --disable-userns --new-session --ro-bind / / -- /bin/true; then
+            echo 'DSH_SSH_TEST_BWRAP=1' >> "$GITHUB_ENV"
+          else
+            echo '::notice::The runner does not allow bubblewrap. SSH file and shell tests will still run.'
+          fi
+      - run: npm test

@@ -1,0 +1,3 @@
+- insert:
+    - id: ssh-switch
+      name: dsh-ssh-switch

@@ -1,0 +1,28 @@
+{
+  "name": "dsh-ssh-switch",
+  "version": "0.1.0",
+  "description": "Switch between local and SSH workspaces in DeepSeek Harness Web",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./src/client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": ["src", "cordis.patch.yml", "README.md"],
+  "license": "UNLICENSED",
+  "engines": { "node": "^22.19 || >=24" },
+  "scripts": { "test": "node --test" },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ]
+    }
+  }
+}
