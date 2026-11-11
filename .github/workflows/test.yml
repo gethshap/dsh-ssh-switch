@@ -18,7 +18,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y openssh-server ripgrep bubblewrap libseccomp2
-          ssh_dir="$(mktemp -d)"
+          ssh_dir="$(mktemp -d "$HOME/dsh-ssh-test.XXXXXX")"
           ssh-keygen -q -t ed25519 -N '' -f "$ssh_dir/host"
           ssh-keygen -q -t ed25519 -N '' -f "$ssh_dir/client"
           printf '[127.0.0.1]:32222 %s\n' "$(cut -d ' ' -f 1,2 "$ssh_dir/host.pub")" > "$ssh_dir/known_hosts"
@@ -43,10 +43,14 @@ jobs:
           EOF
           sudo install -d /run/sshd
           sudo /usr/sbin/sshd -f "$ssh_dir/server_config" -E "$ssh_dir/sshd.log"
+          ssh -F "$ssh_dir/client_config" -o BatchMode=yes -o StrictHostKeyChecking=yes dsh-loopback true || {
+            sudo cat "$ssh_dir/sshd.log"
+            exit 1
+          }
           printf 'DSH_SSH_TEST_CONFIG=%s\n' "$ssh_dir/client_config" >> "$GITHUB_ENV"
-          if bwrap --unshare-all --disable-userns --new-session --ro-bind / / -- /bin/true; then
-            echo 'DSH_SSH_TEST_BWRAP=1' >> "$GITHUB_ENV"
-          else
-            echo '::notice::The runner does not allow bubblewrap. SSH file and shell tests will still run.'
+          if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
+          bwrap --unshare-all --disable-userns --new-session --ro-bind / / -- /bin/true
+          echo 'DSH_SSH_TEST_BWRAP=1' >> "$GITHUB_ENV"
       - run: npm test
